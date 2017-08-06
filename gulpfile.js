@@ -5,6 +5,10 @@ var uglify = require("gulp-uglify");
 var sass = require('gulp-sass');
 var rename = require("gulp-rename");
 var copy = require("gulp-copy");
+var path = require('path');
+var render = require('gulp-ejs');
+var fsextra = require('fs-extra');
+var replace = require('gulp-replace');
 var autoprefixer = require("gulp-autoprefixer");
 var livereload = require("gulp-livereload");
 var del = require("del");
@@ -15,6 +19,10 @@ var preprocess = require('gulp-preprocess');
 var reload = browserSync.reload;
 
 var paths = {
+  root: {
+    src: 'src',
+    dist: 'dist'
+  },
   styles: {
     "src": [
       "src/assets/styles/*.scss",
@@ -45,12 +53,26 @@ var paths = {
     "dist": "dist/assets/data"
   },
   template: {
+    "index": "src/index.ejs",
     "src": [
       "src/html/*.html"
     ],
     "dist": "dist/html",
   }
 };
+
+
+var folderAddress = path.join(__dirname, 'src/html/');
+
+var htmlArr = fsextra.readdirSync(folderAddress);
+
+htmlArr = htmlArr.filter(function(filename){
+  if(/.html/.test(filename)){
+    return filename;
+  }
+})
+
+console.info("htmlArr===>", htmlArr);
 
 gulp.task("scripts", function () {
   var combined = combiner.obj([
@@ -78,6 +100,16 @@ gulp.task("sass", function () {
     livereload()
   ]);
   return combined;
+});
+
+gulp.task("index", function () {
+  return gulp
+    .src(paths.template.index)
+    .pipe(render({
+      list: htmlArr
+    }))
+    .pipe(rename('index.html'))
+    .pipe(gulp.dest(paths.root.dist));
 });
 
 gulp.task("template", function () {
@@ -113,10 +145,8 @@ gulp.task("data", function () {
 
 gulp.task("browser-sync", function() {
     browserSync.init({
-        files: ["./dist/*.html","./dist/**/*"],
-        proxy: {
-          target : "http://127.0.0.1:3000"
-        }
+        server: "./dist",
+        files: ["./dist/html/*.html","./dist/**/*","./dist/**/**/*"],
     });
 });
 
@@ -125,6 +155,7 @@ gulp.task("watch", function() {
   livereload.listen();
   gulp.watch(paths.scripts.src, ["scripts"]);
   gulp.watch(paths.styles.src, ["sass"]);
+  gulp.watch(paths.template.index, ["index"]);
   gulp.watch(paths.template.src, ["template"]);
   gulp.watch(paths.sources.src, ["sources"]);
   gulp.watch(paths.fonts.src, ["fonts"]);
@@ -132,7 +163,7 @@ gulp.task("watch", function() {
   gulp.watch(paths.data.src, ["data"]);
 });
 
-gulp.task("build", ["scripts","template","sass","sources","fonts","libs"], function() {});
+gulp.task("build", ["scripts","index","template","sass","sources","fonts","libs"], function() {});
 
 // The default task (called when you run `gulp` from cli)
-gulp.task("default", ["build", "watch", "browser-sync"]);
+gulp.task("default", ["build", "browser-sync", "watch"]);
